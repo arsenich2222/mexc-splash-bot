@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: splashbot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python splash.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        value: 8271876259:AAG2eUfTwZ5wS89toJVfVfMOZx7ZdGzB9jM
+      - key: ADMIN_USER_ID
+        value: 1049032098

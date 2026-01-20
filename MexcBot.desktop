@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=MEXC Splash Bot
+Exec=C:\splashbot\.venv\Scripts\python.exe C:\splashbot\splash.py
+Path=C:\splashbot
+Icon=
+Terminal=true
+StartupNotify=false
