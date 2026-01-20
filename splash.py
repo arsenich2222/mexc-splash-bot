@@ -1115,12 +1115,12 @@ async def main():
     dp.callback_query.register(handle_users_pagination, F.data.startswith("users_page:"))
     dp.callback_query.register(handle_check_subscription, F.data == "check_subscription")
     
-    print("🚀 Запуск MEXC Splash Alert Bot...")
-    print(f"📊 Мониторинг: ВКЛЮЧЕН")
+    print("[BOT] Starting MEXC Splash Alert Bot...")
+    print("[BOT] Monitoring: ENABLED")
     if admin_user_id:
-        print(f"👑 Админ ID: {admin_user_id}")
-    print(f"💬 Команды пользователя: /start, /search, /subscribe, /unsubscribe, /clear, /my, /setthreshold, /mythreshold")
-    print(f"💬 Команды админа: /users, /user\n")
+        print(f"[BOT] Admin ID: {admin_user_id}")
+    print("[BOT] User commands: /start, /search, /subscribe, /unsubscribe, /clear, /my, /setthreshold, /mythreshold, /tracked")
+    print("[BOT] Admin commands: /users, /user\n")
     
     # Запускаем оба таска параллельно
     await asyncio.gather(
