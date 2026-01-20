@@ -49,6 +49,7 @@ holdvol_state = {}
 bot_users: Set[int] = set()  # Храним ID пользователей которые писали боту
 user_subscriptions: Dict[int, Set[str]] = {}  # Храним подписки пользователей {user_id: {symbols}}
 user_thresholds: Dict[int, float] = {}  # Храним персональные пороги splash {user_id: threshold_percent}
+user_usernames: Dict[int, str] = {}  # Храним ники пользователей {user_id: username}
 
 # Файл для сохранения состояния
 STATE_FILE = "bot_state.json"
@@ -103,7 +104,8 @@ def save_state():
     state = {
         "bot_users": list(bot_users),
         "user_subscriptions": {str(k): list(v) for k, v in user_subscriptions.items()},
-        "user_thresholds": {str(k): v for k, v in user_thresholds.items()}
+        "user_thresholds": {str(k): v for k, v in user_thresholds.items()},
+        "user_usernames": {str(k): v for k, v in user_usernames.items()}
     }
     try:
         with open(STATE_FILE, 'w', encoding='utf-8') as f:
@@ -114,7 +116,7 @@ def save_state():
 
 def load_state():
     """Загружаем состояние бота из файла"""
-    global bot_users, user_subscriptions, user_thresholds
+    global bot_users, user_subscriptions, user_thresholds, user_usernames
     
     if not os.path.exists(STATE_FILE):
         print("[STATE] Файл состояния не найден, начинаем с чистого листа")
@@ -127,6 +129,7 @@ def load_state():
         bot_users = set(state.get("bot_users", []))
         user_subscriptions = {int(k): set(v) for k, v in state.get("user_subscriptions", {}).items()}
         user_thresholds = {int(k): float(v) for k, v in state.get("user_thresholds", {}).items()}
+        user_usernames = {int(k): v for k, v in state.get("user_usernames", {}).items()}
         
         print(f"[STATE] Загружено: {len(bot_users)} пользователей, {sum(len(v) for v in user_subscriptions.values())} подписок")
     except Exception as e:
@@ -202,6 +205,8 @@ async def handle_start(message: types.Message, bot: Bot):
     """Обработка команды /start"""
     user_id = message.from_user.id
     bot_users.add(user_id)
+    # Сохраняем ник пользователя
+    user_usernames[user_id] = message.from_user.username or message.from_user.first_name
     
     # Проверка подписки на канал
     if not await check_subscription(bot, user_id):
@@ -249,10 +254,12 @@ async def send_users_page(target: types.Message | types.CallbackQuery, page: int
     end_idx = min(start_idx + USERS_PER_PAGE, total_users)
     page_users = sorted_users[start_idx:end_idx]
     
-    # Формируем список пользователей
+    # Формируем список пользователей с никнеймами
     if total_users > 0:
-        user_list = "\n".join([f"  {start_idx + i + 1}. User ID: <code>{uid}</code>" 
-                               for i, uid in enumerate(page_users)])
+        user_list = "\n".join([
+            f"  {start_idx + i + 1}. @{user_usernames.get(uid, 'unknown')} (ID: <code>{uid}</code>)" 
+            for i, uid in enumerate(page_users)
+        ])
     else:
         user_list = "<i>Пока нет пользователей</i>"
     
@@ -261,10 +268,9 @@ async def send_users_page(target: types.Message | types.CallbackQuery, page: int
     current_page = page + 1
     
     response = (
-        f"👥 <b>Статистика пользователей</b>\n\n"
-        f"Всего пользователей: <b>{total_users}</b>\n"
-        f"Страница: <b>{current_page}</b> из <b>{total_pages}</b>\n\n"
-        f"<b>Список:</b>\n{user_list}"
+        f"[USERS] Total users: {total_users}\n"
+        f"Page: {current_page} of {total_pages}\n\n"
+        f"<b>List:</b>\n{user_list}"
     )
     
     # Создаем кнопки пагинации
@@ -273,11 +279,11 @@ async def send_users_page(target: types.Message | types.CallbackQuery, page: int
     
     # Кнопка "Назад"
     if page > 0:
-        buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"users_page:{page-1}"))
+        buttons.append(InlineKeyboardButton(text="<- Back", callback_data=f"users_page:{page-1}"))
     
     # Кнопка "Вперед"
     if end_idx < total_users:
-        buttons.append(InlineKeyboardButton(text="Вперед ➡️", callback_data=f"users_page:{page+1}"))
+        buttons.append(InlineKeyboardButton(text="Next ->", callback_data=f"users_page:{page+1}"))
     
     if buttons:
         keyboard.append(buttons)
@@ -691,6 +697,7 @@ async def handle_user_info(message: types.Message):
     # Получаем подписки пользователя
     subscriptions = user_subscriptions.get(target_user_id, set())
     custom_threshold = user_thresholds.get(target_user_id)
+    username = user_usernames.get(target_user_id, "unknown")
     
     if not subscriptions:
         sub_list = "<i>Нет подписок</i>"
@@ -701,11 +708,11 @@ async def handle_user_info(message: types.Message):
     threshold_text = f"Персональный: <b>{custom_threshold}%</b>" if custom_threshold else f"По умолчанию: {CASUAL_SPLASH_THRESHOLD}%"
     
     response = (
-        f"👤 <b>Информация о пользователе</b>\n\n"
-        f"User ID: <code>{target_user_id}</code>\n"
-        f"Подписок: <b>{len(subscriptions)}</b>\n"
-        f"Порог splash: {threshold_text}\n\n"
-        f"<b>Отслеживаемые монеты:</b>\n{sub_list}"
+        f"[USER] @{username}\n\n"
+        f"ID: <code>{target_user_id}</code>\n"
+        f"Subscriptions: <b>{len(subscriptions)}</b>\n"
+        f"Threshold: {threshold_text}\n\n"
+        f"<b>Tracked coins:</b>\n{sub_list}"
     )
     
     await message.answer(response, parse_mode="HTML")
@@ -745,9 +752,8 @@ async def handle_all_tracked(message: types.Message):
     detailed_list = "\n".join([f"  • <code>{symbol}</code> — {coin_user_count[symbol]} пользователь(ей)" for symbol in sorted_coins])
     
     response = (
-        f"📊 <b>Все отслеживаемые монеты</b>\n\n"
-        f"Всего уникальных монет: <b>{len(all_tracked)}</b>\n\n"
-        f"<b>Статистика:</b>\n{detailed_list}"
+        f"[TRACKED] Total unique coins: {len(all_tracked)}\n\n"
+        f"<b>Statistics:</b>\n{detailed_list}"
     )
     
     await message.answer(response, parse_mode="HTML")
