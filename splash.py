@@ -33,7 +33,7 @@ else:
     admin_user_id = None
 # ----------------- Обязательная подписка -----------------
 REQUIRED_CHANNEL = "@mexcsofts"  # Канал на который нужно подписаться
-REQUIRED_CHANNEL_ID = -1002509308697  # ID канала (без @)
+REQUIRED_CHANNEL_ID = -1003419272973  # ID канала (без @)
 
 # ----------------- Splash state -----------------
 STOCKS_SPLASH_THRESHOLD = 1
