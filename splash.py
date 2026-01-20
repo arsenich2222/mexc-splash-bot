@@ -709,6 +709,48 @@ async def handle_user_info(message: types.Message):
     
     await message.answer(response, parse_mode="HTML")
 
+async def handle_all_tracked(message: types.Message):
+    """Обработка команды /all_tracked - показать все отслеживаемые монеты (только для админа)"""
+    user_id = message.from_user.id
+    
+    # Проверка админа
+    if admin_user_id and user_id != admin_user_id:
+        await message.answer("❌ У вас нет доступа к этой команде.")
+        return
+    
+    # Собираем все уникальные монеты
+    all_tracked = set()
+    for subscribed_symbols in user_subscriptions.values():
+        all_tracked.update(subscribed_symbols)
+    
+    if not all_tracked:
+        await message.answer(
+            "📭 Никто не отслеживает никакие монеты.",
+            parse_mode="HTML"
+        )
+        return
+    
+    # Сортируем и форматируем список
+    sorted_coins = sorted(all_tracked)
+    coins_list = "\n".join([f"  • <code>{symbol}</code>" for symbol in sorted_coins])
+    
+    # Считаем сколько пользователей отслеживают каждую монету
+    coin_user_count = {}
+    for subscribed_symbols in user_subscriptions.values():
+        for symbol in subscribed_symbols:
+            coin_user_count[symbol] = coin_user_count.get(symbol, 0) + 1
+    
+    # Формируем статистику
+    detailed_list = "\n".join([f"  • <code>{symbol}</code> — {coin_user_count[symbol]} пользователь(ей)" for symbol in sorted_coins])
+    
+    response = (
+        f"📊 <b>Все отслеживаемые монеты</b>\n\n"
+        f"Всего уникальных монет: <b>{len(all_tracked)}</b>\n\n"
+        f"<b>Статистика:</b>\n{detailed_list}"
+    )
+    
+    await message.answer(response, parse_mode="HTML")
+
 async def bot_polling(bot: Bot, dp: Dispatcher):
     """Запуск polling для обработки команд"""
     print("[BOT] Запущен обработчик команд...")
@@ -1060,6 +1102,7 @@ async def main():
     dp.message.register(handle_watch, Command(commands=["watch", "status"]))
     dp.message.register(handle_users, Command(commands=["users"]))
     dp.message.register(handle_user_info, Command(commands=["user"]))
+    dp.message.register(handle_all_tracked, Command(commands=["all_tracked", "tracked"]))
     dp.message.register(handle_subscribe, Command(commands=["subscribe", "sub"]))
     dp.message.register(handle_unsubscribe, Command(commands=["unsubscribe", "unsub"]))
     dp.message.register(handle_clear_subscriptions, Command(commands=["clear", "clearall"]))
