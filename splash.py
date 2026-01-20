@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Dict, Set
 import os
 from dotenv import load_dotenv
+import aiohttp
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -1102,7 +1103,7 @@ async def main():
     dp.message.register(handle_watch, Command(commands=["watch", "status"]))
     dp.message.register(handle_users, Command(commands=["users"]))
     dp.message.register(handle_user_info, Command(commands=["user"]))
-    dp.message.register(handle_all_tracked, Command(commands=["all_tracked", "tracked"]))
+    dp.message.register(handle_all_tracked, Command(commands=["tracked"]))
     dp.message.register(handle_subscribe, Command(commands=["subscribe", "sub"]))
     dp.message.register(handle_unsubscribe, Command(commands=["unsubscribe", "unsub"]))
     dp.message.register(handle_clear_subscriptions, Command(commands=["clear", "clearall"]))
