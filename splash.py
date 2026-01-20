@@ -31,6 +31,10 @@ if admin_user_id and admin_user_id.strip():
         admin_user_id = None
 else:
     admin_user_id = None
+# ----------------- Обязательная подписка -----------------
+REQUIRED_CHANNEL = "@mexcsofts"  # Канал на который нужно подписаться
+REQUIRED_CHANNEL_ID = -1002509308697  # ID канала (без @)
+
 # ----------------- Splash state -----------------
 STOCKS_SPLASH_THRESHOLD = 1
 CASUAL_SPLASH_THRESHOLD = 5
@@ -48,6 +52,41 @@ user_thresholds: Dict[int, float] = {}  # Храним персональные 
 
 # Файл для сохранения состояния
 STATE_FILE = "bot_state.json"
+
+async def check_subscription(bot: Bot, user_id: int) -> bool:
+    """Проверяет подписку пользователя на обязательный канал"""
+    try:
+        member = await bot.get_chat_member(chat_id=REQUIRED_CHANNEL_ID, user_id=user_id)
+        # Проверяем статус: member, administrator, creator
+        return member.status in ["member", "administrator", "creator"]
+    except Exception as e:
+        print(f"[SUBSCRIPTION] Ошибка проверки подписки для {user_id}: {e}")
+        return False
+
+async def send_subscription_required(message: types.Message):
+    """Отправляет сообщение о необходимости подписки с кнопками"""
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="📢 Подписаться на канал",
+                url=f"https://t.me/{REQUIRED_CHANNEL.replace('@', '')}"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="✅ Проверить подписку",
+                callback_data="check_subscription"
+            )
+        ]
+    ])
+    
+    await message.answer(
+        f"🔒 <b>Для использования бота необходимо подписаться на канал!</b>\n\n"
+        f"📢 Канал: {REQUIRED_CHANNEL}\n\n"
+        f"После подписки нажмите кнопку \"Проверить подписку\"",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
 
 def save_state():
     """Сохраняем состояние бота в файл"""
@@ -149,19 +188,20 @@ async def send_telegram_message(session, chat_id, text):
         print("Telegram error:", e)
 
 # ----------------- Bot Commands -----------------
-async def handle_start(message: types.Message):
+async def handle_start(message: types.Message, bot: Bot):
     """Обработка команды /start"""
     user_id = message.from_user.id
     bot_users.add(user_id)
     
+    # Проверка подписки на канал
+    if not await check_subscription(bot, user_id):
+        await send_subscription_required(message)
+        return
+    
     username = message.from_user.username or message.from_user.first_name
     await message.answer(
         f"👋 Привет, {username}!\n\n"
-        f"🤖 Это бот для мониторинга фьючерсов MEXC.\n"
-        f"📊 Он автоматически отслеживает:\n"
-        f"  • Price Splash (резкие изменения цены)\n"
-        f"  • Отклонения Fair Price\n"
-        f"  • Изменения Open Interest\n\n"
+        f"🤖 Это бот для мониторинга сплешей и дампов MEXC .\n"
         f"📝 <b>Доступные команды:</b>\n"
         f"  /search BTC - найти доступные монеты\n"
         f"  /subscribe SYMBOL - подписаться на монету\n"
@@ -252,10 +292,38 @@ async def handle_users_pagination(callback: types.CallbackQuery):
     page = int(callback.data.split(":")[1])
     await send_users_page(callback, page)
 
-async def handle_subscribe(message: types.Message):
+async def handle_check_subscription(callback: types.CallbackQuery, bot: Bot):
+    """Обработка нажатия кнопки проверки подписки"""
+    user_id = callback.from_user.id
+    
+    # Проверяем подписку
+    is_subscribed = await check_subscription(bot, user_id)
+    
+    if is_subscribed:
+        await callback.message.edit_text(
+            f"✅ <b>Отлично!</b>\n\n"
+            f"Вы подписаны на канал {REQUIRED_CHANNEL}\n\n"
+            f"Теперь вам доступны все функции бота!\n"
+            f"Используйте /start для начала работы.",
+            parse_mode="HTML"
+        )
+        await callback.answer("✅ Подписка подтверждена!")
+    else:
+        await callback.answer(
+            f"❌ Вы еще не подписаны на канал {REQUIRED_CHANNEL}\n\n"
+            f"Подпишитесь и попробуйте снова!",
+            show_alert=True
+        )
+
+async def handle_subscribe(message: types.Message, bot: Bot):
     """Обработка команды /subscribe SYMBOL - подписка на монету"""
     user_id = message.from_user.id
     bot_users.add(user_id)
+    
+    # Проверка подписки на канал
+    if not await check_subscription(bot, user_id):
+        await send_subscription_required(message)
+        return
     
     # Извлекаем символ из команды
     args = message.text.split(maxsplit=1)
@@ -312,9 +380,14 @@ async def handle_subscribe(message: types.Message):
     )
     print(f"[BOT] User {user_id} subscribed to {symbol}")
 
-async def handle_unsubscribe(message: types.Message):
+async def handle_unsubscribe(message: types.Message, bot: Bot):
     """Обработка команды /unsubscribe SYMBOL - отписка от монеты"""
     user_id = message.from_user.id
+    
+    # Проверка подписки на канал
+    if not await check_subscription(bot, user_id):
+        await send_subscription_required(message)
+        return
     
     # Извлекаем символ из команды
     args = message.text.split(maxsplit=1)
@@ -346,9 +419,14 @@ async def handle_unsubscribe(message: types.Message):
     )
     print(f"[BOT] User {user_id} unsubscribed from {symbol}")
 
-async def handle_clear_subscriptions(message: types.Message):
+async def handle_clear_subscriptions(message: types.Message, bot: Bot):
     """Обработка команды /clear - удалить все подписки"""
     user_id = message.from_user.id
+    
+    # Проверка подписки на канал
+    if not await check_subscription(bot, user_id):
+        await send_subscription_required(message)
+        return
     
     # Проверяем есть ли подписки
     if user_id not in user_subscriptions or not user_subscriptions[user_id]:
@@ -366,10 +444,15 @@ async def handle_clear_subscriptions(message: types.Message):
     )
     print(f"[BOT] User {user_id} cleared all subscriptions ({count} coins)")
 
-async def handle_my_subscriptions(message: types.Message):
+async def handle_my_subscriptions(message: types.Message, bot: Bot):
     """Обработка команды /my - показать свои подписки"""
     user_id = message.from_user.id
     bot_users.add(user_id)
+    
+    # Проверка подписки на канал
+    if not await check_subscription(bot, user_id):
+        await send_subscription_required(message)
+        return
     
     # Проверяем есть ли подписки
     if user_id not in user_subscriptions or not user_subscriptions[user_id]:
@@ -395,9 +478,15 @@ async def handle_my_subscriptions(message: types.Message):
         parse_mode="HTML"
     )
 
-async def handle_set_threshold(message: types.Message):
+async def handle_set_threshold(message: types.Message, bot: Bot):
     """Обработка команды /setthreshold ПРОЦЕНТ - установить персональный порог splash"""
     user_id = message.from_user.id
+    
+    # Проверка подписки на канал
+    if not await check_subscription(bot, user_id):
+        await send_subscription_required(message)
+        return
+    
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
         await message.answer(
@@ -969,8 +1058,9 @@ async def main():
     dp.message.register(handle_set_threshold, Command(commands=["setthreshold", "threshold"]))
     dp.message.register(handle_my_threshold, Command(commands=["mythreshold", "mythres"]))
     
-    # Регистрация callback handler для пагинации
+    # Регистрация callback handler для пагинации и проверки подписки
     dp.callback_query.register(handle_users_pagination, F.data.startswith("users_page:"))
+    dp.callback_query.register(handle_check_subscription, F.data == "check_subscription")
     
     print("🚀 Запуск MEXC Splash Alert Bot...")
     print(f"📊 Мониторинг: ВКЛЮЧЕН")
