@@ -1,0 +1,17 @@
+[build]
+builder = "paacketo"
+
+[env]
+  TELEGRAM_BOT_TOKEN = "8271876259:AAG2eUfTwZ5wS89toJVfVfMOZx7ZdGzB9jM"
+  ADMIN_USER_ID = "1049032098"
+
+[[services]]
+  internal_port = 8080
+  processes = ["app"]
+
+  [services.tcp_checks]
+    enabled = true
+    grace_period = "1s"
+    interval = 10000
+    min_conns = 1
+    timeout = 5000
