@@ -55,12 +55,22 @@ STATE_FILE = "bot_state.json"
 
 async def check_subscription(bot: Bot, user_id: int) -> bool:
     """Проверяет подписку пользователя на обязательный канал"""
+    # Админ всегда имеет доступ
+    if admin_user_id and user_id == admin_user_id:
+        return True
+    
     try:
         member = await bot.get_chat_member(chat_id=REQUIRED_CHANNEL_ID, user_id=user_id)
         # Проверяем статус: member, administrator, creator
-        return member.status in ["member", "administrator", "creator"]
+        is_subscribed = member.status in ["member", "administrator", "creator"]
+        print(f"[SUBSCRIPTION] User {user_id} subscription check: {is_subscribed} (status: {member.status})")
+        return is_subscribed
     except Exception as e:
         print(f"[SUBSCRIPTION] Ошибка проверки подписки для {user_id}: {e}")
+        # Если ошибка доступа к каналу - пропускаем проверку (бот не админ канала)
+        if "chat not found" in str(e).lower() or "forbidden" in str(e).lower():
+            print(f"[SUBSCRIPTION] Бот не имеет доступа к каналу, пропускаем проверку")
+            return True
         return False
 
 async def send_subscription_required(message: types.Message):
