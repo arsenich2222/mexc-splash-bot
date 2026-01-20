@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+bot_state.json
+splash_backup.py
+test_token.py
+.vscode/
+*.log

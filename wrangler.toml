@@ -1,0 +1,10 @@
+name = "splashbot"
+main = "worker.py"
+compatibility_date = "2024-01-20"
+
+[vars]
+TELEGRAM_BOT_TOKEN = "8271876259:AAG2eUfTwZ5wS89toJVfVfMOZx7ZdGzB9jM"
+ADMIN_USER_ID = "1049032098"
+
+# Cloudflare Workers підтримує Python
+workers_dev = true
